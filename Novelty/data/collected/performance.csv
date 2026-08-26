@@ -1,0 +1,5 @@
+request_rate,cpu_millicores,slo_ms,replicas,utilization,response_ms
+0.0748077521447304,600,350,1,0,97.5
+0.0,600,350,1,0,0.0
+0.0,600,350,1,0,0.0
+0.1252304487767117,600,350,1,0,4.75

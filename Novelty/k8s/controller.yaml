@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: novelty-hybrid-controller, namespace: hybrid-autoscaling}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: novelty-hybrid-controller, namespace: hybrid-autoscaling}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    verbs: ["get", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/resize"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: novelty-hybrid-controller, namespace: hybrid-autoscaling}
+subjects: [{kind: ServiceAccount, name: novelty-hybrid-controller}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: novelty-hybrid-controller}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: novelty-hybrid-controller, namespace: hybrid-autoscaling}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: novelty-hybrid-controller}}
+  template:
+    metadata: {labels: {app: novelty-hybrid-controller}}
+    spec:
+      serviceAccountName: novelty-hybrid-controller
+      containers:
+        - name: controller
+          image: novelty-hybrid-controller:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8080}]
+          env:
+            - {name: APPLY_CHANGES, value: 'false'}
+            - {name: NAMESPACE, value: hybrid-autoscaling}
+            - {name: DEPLOYMENT, value: house-price}
+            - {name: PROMETHEUS_URL, value: 'http://kube-prometheus-stack-prometheus.monitoring.svc:9090'}
+            - {name: FORECASTER, value: quantile_bilstm}
+            - {name: FORECAST_MODEL, value: Novelty/models/quantile_bilstm.pt}
+            - {name: PERFORMANCE_MODEL_KIND, value: dtr}
+            - {name: PERFORMANCE_MODEL, value: Novelty/models/performance.joblib}
+            - {name: BURST_POLICY, value: tuned_adaptive}
+            - {name: EXECUTION_BACKEND, value: inplace}
+            - {name: ADAPTIVE_MONITORING, value: 'true'}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: novelty-hybrid-controller, namespace: hybrid-autoscaling}
+spec: {selector: {app: novelty-hybrid-controller}, ports: [{port: 8080, targetPort: 8080}]}

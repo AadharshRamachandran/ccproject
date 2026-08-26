@@ -1,0 +1,5 @@
+# The controller must use a dedicated Service selector and wait for readiness before deleting the old revision.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: house-price-availability, namespace: hybrid-autoscaling}
+spec: {minAvailable: 1, selector: {matchLabels: {app: house-price}}}

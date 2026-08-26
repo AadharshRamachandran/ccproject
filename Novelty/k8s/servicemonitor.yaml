@@ -1,0 +1,6 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: {name: house-price, namespace: hybrid-autoscaling}
+spec:
+  selector: {matchLabels: {app: house-price}}
+  endpoints: [{port: http, path: /metrics, interval: 15s}]

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: hybrid-controller, namespace: hybrid-autoscaling}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: hybrid-controller}}
+  template:
+    metadata: {labels: {app: hybrid-controller}}
+    spec:
+      serviceAccountName: hybrid-controller
+      containers:
+        - name: controller
+          image: hybrid-controller:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8080}]
+          env:
+            - {name: APPLY_CHANGES, value: 'true'}
+            - {name: NAMESPACE, value: hybrid-autoscaling}
+            - {name: DEPLOYMENT, value: house-price}
+            - {name: PROMETHEUS_URL, value: 'http://kube-prometheus-stack-prometheus.monitoring.svc:9090'}
+            - {name: EXECUTION_BACKEND, value: rolling}
+            - {name: ADAPTIVE_MONITORING, value: 'false'}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: hybrid-controller, namespace: hybrid-autoscaling}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: hybrid-controller, namespace: hybrid-autoscaling}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments","deployments/scale"]
+    verbs: ["get","create","patch","delete"]
+  - apiGroups: [""]
+    resources: ["pods","pods/resize"]
+    verbs: ["get","list","patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: hybrid-controller, namespace: hybrid-autoscaling}
+subjects: [{kind: ServiceAccount, name: hybrid-controller}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: hybrid-controller}

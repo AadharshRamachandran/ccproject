@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: house-price, namespace: hybrid-autoscaling}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: house-price}}
+  template:
+    metadata: {labels: {app: house-price}}
+    spec:
+      containers:
+        - name: app
+          image: hybrid-house-price:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8000}]
+          resources: {requests: {cpu: 600m, memory: 128Mi}, limits: {cpu: 950m, memory: 256Mi}}
+          resizePolicy: [{resourceName: cpu, restartPolicy: NotRequired}]
+          readinessProbe: {httpGet: {path: /healthz, port: http}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: house-price, namespace: hybrid-autoscaling, labels: {app: house-price}}
+spec: {selector: {app: house-price}, ports: [{name: http, port: 80, targetPort: http}]}

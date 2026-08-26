@@ -1,0 +1,11 @@
+# Runtime dependencies only. The controller performs CPU inference; installing
+# CUDA/Triton wheels in a Linux container wastes several GB and can fail on
+# Docker Desktop hosts that do not provide a compatible GPU runtime.
+fastapi==0.115.8
+uvicorn[standard]==0.34.0
+numpy==2.2.2
+pandas==2.2.3
+scikit-learn==1.6.1
+prometheus-client==0.21.1
+requests==2.32.3
+kubernetes==32.0.0
