@@ -8,5 +8,11 @@ RUN pip install --no-cache-dir --timeout 120 --retries 5 \
     && pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.txt
 COPY Paper ./Paper
 COPY Novelty ./Novelty
-RUN ln -s /app/Paper/src /app/src && ln -s /app/Paper/controller /app/controller && mkdir -p /app/Paper/models
+# Symlink src/ and controller/ for import resolution.
+# Symlink Paper/models -> models/ so the default FORECAST_MODEL / PERFORMANCE_MODEL
+# env-var values ('models/bilstm.pt', 'models/performance.joblib') resolve
+# correctly relative to /app without requiring explicit overrides in the manifest.
+RUN ln -s /app/Paper/src /app/src \
+ && ln -s /app/Paper/controller /app/controller \
+ && ln -s /app/Paper/models /app/models
 CMD ["uvicorn","controller.main:app","--host","0.0.0.0","--port","8080"]

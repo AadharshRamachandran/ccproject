@@ -18,8 +18,16 @@ spec:
             - {name: NAMESPACE, value: hybrid-autoscaling}
             - {name: DEPLOYMENT, value: house-price}
             - {name: PROMETHEUS_URL, value: 'http://kube-prometheus-stack-prometheus.monitoring.svc:9090'}
+            # EXECUTION_BACKEND=rolling: new Deployments get a unique cpu-gen
+            # label added to their selector so they never overlap with the old
+            # Deployment's selector (Kubernetes requirement for stable ownership).
             - {name: EXECUTION_BACKEND, value: rolling}
             - {name: ADAPTIVE_MONITORING, value: 'false'}
+            # Explicit model paths relative to WORKDIR /app.
+            # Dockerfile symlinks Paper/models -> /app/models, but setting these
+            # explicitly avoids a crash-loop if the symlink is ever missing.
+            - {name: FORECAST_MODEL,    value: Paper/models/bilstm.pt}
+            - {name: PERFORMANCE_MODEL, value: Paper/models/performance.joblib}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -39,5 +47,5 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata: {name: hybrid-controller, namespace: hybrid-autoscaling}
-subjects: [{kind: ServiceAccount, name: hybrid-controller}]
+subjects: [{kind: ServiceAccount, name: hybrid-controller, namespace: hybrid-autoscaling}]
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: hybrid-controller}
