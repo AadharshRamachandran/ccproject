@@ -1,0 +1,12 @@
+# Keep the root-context controller build small and deterministic.
+.git/
+.venv/
+worldcup98-dataset/
+*.pdf
+*.zip
+__pycache__/
+**/__pycache__/
+Paper/.venv/
+Paper/data/
+Paper/tests/
+Novelty/results/
