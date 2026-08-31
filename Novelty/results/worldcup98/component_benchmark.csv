@@ -1,4 +1,4 @@
 component,name,rmse,mae,train_points,test_points,epochs,mae_vs_bilstm,policy_eligible,replicas_mse,replicas_mae,utilization_mse,utilization_mae,replicas_interval95_coverage,utilization_interval95_coverage,replicas_mae_vs_dtr,utilization_mae_vs_dtr
-forecaster,bilstm,82.73968909525423,65.90642039928589,5760,1440,80.0,1.0,True,,,,,,,,
-forecaster,quantile_bilstm,82.94644748805273,66.2864162273768,5760,1440,80.0,1.005765687558037,True,,,,,,,,
+forecaster,bilstm,92.76547666613263,75.34287618768187,5760,1440,80.0,1.0,True,,,,,,,,
+forecaster,quantile_bilstm,82.56467444962884,65.91787668794495,5760,1440,80.0,0.8749052335583939,True,,,,,,,,
 performance_model,dtr,,,160,40,,,True,0.3,0.3,0.013550052261359854,0.09329636423747076,,,1.0,1.0

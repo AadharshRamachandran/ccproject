@@ -16,7 +16,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata: {name: novelty-hybrid-controller, namespace: hybrid-autoscaling}
-subjects: [{kind: ServiceAccount, name: novelty-hybrid-controller}]
+subjects: [{kind: ServiceAccount, name: novelty-hybrid-controller, namespace: hybrid-autoscaling}]
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: novelty-hybrid-controller}
 ---
 apiVersion: apps/v1
