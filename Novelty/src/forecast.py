@@ -1,4 +1,4 @@
-﻿"""Workload forecasters: paper Bi-LSTM baseline plus novelty quantile-BiLSTM.
+"""Workload forecasters: paper Bi-LSTM baseline plus novelty quantile-BiLSTM.
 
 All forecasters live here so that downstream code (controller, ablation, training
 scripts) can import from a single authoritative location:
@@ -16,6 +16,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
+from Paper.src.forecast import BiLSTM, WorkloadForecaster
 
 
 # ---------------------------------------------------------------------------
@@ -42,89 +43,8 @@ def _report_epoch(label, epoch, epochs, loss, progress_every):
 
 
 # ---------------------------------------------------------------------------
-# Paper baseline: deterministic Bi-LSTM  (originally in Paper/src/forecast.py)
-# ---------------------------------------------------------------------------
+# The deterministic baseline is imported from Paper/src/forecast.py.
 
-class BiLSTM(nn.Module):
-    def __init__(self, hidden=32):
-        super().__init__()
-        self.lstm = nn.LSTM(1, hidden, batch_first=True, bidirectional=True)
-        self.out = nn.Linear(hidden * 2, 1)
-
-    def forward(self, x):
-        return self.out(self.lstm(x)[0][:, -1, :])
-
-
-class WorkloadForecaster:
-    """Paper Bi-LSTM: 10 historic points predict the next normalized rate."""
-
-    def __init__(self, lookback=10, hidden=32):
-        self.lookback = lookback
-        self.model = BiLSTM(hidden)
-        self.minimum, self.maximum = 0., 1.
-
-    def fit(self, values, epochs=80, learning_rate=.005, batch_size=512,
-            window_stride=1, progress_every=0, label='bilstm', seed=None):
-        if seed is not None:
-            random.seed(seed)
-            np.random.seed(seed)
-            torch.manual_seed(seed)
-        values = np.asarray(values, dtype=np.float32)
-        self.minimum, self.maximum = float(values.min()), float(values.max())
-        span = max(self.maximum - self.minimum, 1e-9)
-        norm = (values - self.minimum) / span
-        x, y = _windows(norm, self.lookback, window_stride)
-        if not len(x):
-            raise ValueError('Need more data than lookback')
-        X = torch.tensor(x).unsqueeze(-1)
-        Y = torch.tensor(y).unsqueeze(-1)
-        batches = DataLoader(TensorDataset(X, Y), batch_size=batch_size, shuffle=True)
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-        loss_fn = nn.MSELoss()
-        self.model.train()
-        # Do not run every window through one autograd graph: World Cup '98 has
-        # over 100k minute points, which otherwise needs multiple GB of RAM.
-        for epoch in range(1, epochs + 1):
-            epoch_loss = 0.0
-            batches_seen = 0
-            for batch_x, batch_y in batches:
-               optimizer.zero_grad()
-               value = loss_fn(self.model(batch_x), batch_y)
-               value.backward()
-               optimizer.step()
-               epoch_loss += float(value.detach())
-               batches_seen += 1
-            _report_epoch(label, epoch, epochs, epoch_loss / max(batches_seen, 1), progress_every)
-
-    def predict(self, history):
-        if len(history) < self.lookback:
-            return float(history[-1]) if history else 0.
-        span = max(self.maximum - self.minimum, 1e-9)
-        x = (np.asarray(history[-self.lookback:], dtype=np.float32) - self.minimum) / span
-        self.model.eval()
-        with torch.no_grad():
-            normalized = float(self.model(torch.tensor(x).view(1, self.lookback, 1)).item())
-        return max(0., normalized * span + self.minimum)
-
-    def save(self, path):
-        torch.save({
-            'state': self.model.state_dict(),
-            'minimum': self.minimum,
-            'maximum': self.maximum,
-            'lookback': self.lookback,
-        }, path)
-
-    @classmethod
-    def load(cls, path):
-        saved = torch.load(path, map_location='cpu', weights_only=True)
-        obj = cls(saved['lookback'])
-        obj.model.load_state_dict(saved['state'])
-        obj.minimum = saved['minimum']
-        obj.maximum = saved['maximum']
-        return obj
-
-
-# ---------------------------------------------------------------------------
 # Novelty: Probabilistic Quantile Bi-LSTM
 # ---------------------------------------------------------------------------
 
@@ -164,7 +84,10 @@ class QuantileBiLSTMForecaster:
         if not len(x):
             raise ValueError('Need more data than lookback')
         X = torch.tensor(x).unsqueeze(-1)
-        Y = torch.tensor(y).unsqueeze(-1)
+        # Learn quantile residuals around the last observed level.  The
+        # skip connection gives each quantile a persistence baseline and lets
+        # the network focus on the next-step change.
+        Y = torch.tensor(y - x[:, -1]).unsqueeze(-1)
         batches = DataLoader(TensorDataset(X, Y), batch_size=batch_size, shuffle=True)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
         q = self.quantiles.view(1, -1)
@@ -190,9 +113,26 @@ class QuantileBiLSTMForecaster:
         x = (np.asarray(history[-self.lookback:], dtype=np.float32) - self.minimum) / scale
         self.model.eval()
         with torch.no_grad():
-            values = self.model(torch.tensor(x).view(1, self.lookback, 1))[0].numpy()
+            residuals = self.model(torch.tensor(x).view(1, self.lookback, 1))[0].numpy()
+        values = residuals + x[-1]
         values = np.sort(values) * scale + self.minimum
         return tuple(float(max(0., v)) for v in values)
+
+    def predict_intervals_many(self, history, values, batch_size=4096):
+        """Batch teacher-forced one-step quantile predictions."""
+        values = np.asarray(values, dtype=np.float32)
+        context = np.concatenate((np.asarray(history, dtype=np.float32)[-self.lookback:], values))
+        windows = np.lib.stride_tricks.sliding_window_view(context, self.lookback + 1)[:len(values), :-1]
+        scale = max(self.maximum - self.minimum, 1e-9)
+        windows = (windows - self.minimum) / scale
+        outputs=[]; self.model.eval()
+        with torch.no_grad():
+            for start in range(0, len(windows), batch_size):
+                x=torch.as_tensor(windows[start:start+batch_size]).unsqueeze(-1)
+                residuals=self.model(x).cpu().numpy()
+                outputs.extend((residuals + windows[start:start+batch_size, -1, None]).tolist())
+        intervals=np.sort(np.asarray(outputs),axis=1)*scale+self.minimum
+        return np.maximum(0., intervals)
 
     def save(self, path):
         torch.save({
@@ -202,11 +142,14 @@ class QuantileBiLSTMForecaster:
             'lookback': self.lookback,
             'hidden': self.hidden,
             'dropout': self.dropout,
+            'target_mode': 'residual_quantiles_v1',
         }, path)
 
     @classmethod
     def load(cls, path):
         saved = torch.load(path, map_location='cpu', weights_only=True)
+        if saved.get('target_mode') != 'residual_quantiles_v1':
+            raise ValueError('This quantile checkpoint predates residual quantile training; retrain it with scripts/train_novelty.py.')
         obj = cls(saved['lookback'], saved['hidden'], saved['dropout'])
         obj.model.load_state_dict(saved['state'])
         obj.minimum = saved['minimum']

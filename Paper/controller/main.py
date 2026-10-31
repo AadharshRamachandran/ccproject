@@ -15,6 +15,7 @@ forecast=WorkloadForecaster.load(os.getenv('FORECAST_MODEL','models/bilstm.pt'))
 performance=PerformanceModel.load(os.getenv('PERFORMANCE_MODEL','models/performance.joblib'))
 detector=OnlineBurstDetector(); provisioner=HybridProvisioner(performance); history=deque(maxlen=120); lock=Lock(); latest={}
 namespace=os.getenv('NAMESPACE','hybrid-autoscaling'); deployment=os.getenv('DEPLOYMENT','house-price')
+detector_warmed=False
 if os.getenv('APPLY_CHANGES','false').lower()=='true':
     executor = (InPlaceResizeExecutor(namespace,deployment) if os.getenv('EXECUTION_BACKEND','rolling').lower()=='inplace'
                 else RollingUpdateExecutor(namespace,deployment))
@@ -22,9 +23,13 @@ else: executor=None
 
 def process(qps):
     """Observe q(t), then calculate and optionally apply a decision for q(t+1)."""
+    global detector_warmed
     with lock:
         history.append(float(qps))
         if len(history)<forecast.lookback: return {'status':'warming','samples':len(history)}
+        if not detector_warmed:
+            detector.warm(list(history)[-detector.values.maxlen:])
+            detector_warmed=True
         predicted=forecast.predict(list(history)); burst=detector.update(predicted); decision=provisioner.decide(predicted,burst)
         result={'status':'ready','observed_qps':qps,'predicted_qps':predicted,'burst':burst,'replicas':decision.replicas,'cpu_millicores':decision.cpu_millicores,'utilization':decision.utilization}
         if executor: result['execution']=executor.execute(decision)

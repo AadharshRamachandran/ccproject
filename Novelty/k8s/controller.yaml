@@ -35,17 +35,19 @@ spec:
           imagePullPolicy: IfNotPresent
           ports: [{containerPort: 8080}]
           env:
+            # Live actuation is gated off until the dashboard/experiment runner
+            # explicitly opts in through POST /configure.
             - {name: APPLY_CHANGES, value: 'false'}
             - {name: NAMESPACE, value: hybrid-autoscaling}
             - {name: DEPLOYMENT, value: house-price}
+            - {name: CONTAINER, value: app}
+            - {name: MODELS_DIR, value: /app/Novelty/models/paper_live_segments}
             - {name: PROMETHEUS_URL, value: 'http://kube-prometheus-stack-prometheus.monitoring.svc:9090'}
-            - {name: FORECASTER, value: quantile_bilstm}
-            - {name: FORECAST_MODEL, value: Novelty/models/quantile_bilstm.pt}
             - {name: PERFORMANCE_MODEL_KIND, value: dtr}
-            - {name: PERFORMANCE_MODEL, value: Novelty/models/performance.joblib}
-            - {name: BURST_POLICY, value: tuned_adaptive}
-            - {name: EXECUTION_BACKEND, value: inplace}
-            - {name: ADAPTIVE_MONITORING, value: 'true'}
+            - {name: PERFORMANCE_MODEL, value: /app/Novelty/models/performance.joblib}
+            - {name: INTERVAL_SECONDS, value: '60'}
+            - {name: SLO_MS, value: '350'}
+            - {name: MONITOR_ENABLED, value: 'true'}
 ---
 apiVersion: v1
 kind: Service

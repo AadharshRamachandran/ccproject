@@ -1,0 +1,15 @@
+trace,model,RMSE,MAE
+Wikipedia,ARIMA,0.985,0.699
+Wikipedia,LR,0.872,0.643
+Wikipedia,EN,0.778,0.589
+Wikipedia,OLS,0.921,0.73
+Wikipedia,NNLS,0.879,0.62
+Wikipedia,LSTM,0.742,0.542
+Wikipedia,Bi-LSTM,0.655,0.466
+FIFA World Cup,ARIMA,0.875,0.523
+FIFA World Cup,LR,0.709,0.623
+FIFA World Cup,EN,0.636,0.419
+FIFA World Cup,OLS,0.91,0.66
+FIFA World Cup,NNLS,0.88,0.653
+FIFA World Cup,LSTM,0.509,0.323
+FIFA World Cup,Bi-LSTM,0.436,0.289

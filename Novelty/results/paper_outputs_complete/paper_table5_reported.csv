@@ -1,0 +1,5 @@
+Trace,Burst zone,Reactive HPA average pod utilization (%),Proactive HPA average pod utilization (%),Paper proposal average pod utilization (%)
+Wikipedia,ON,76.68,73.51,73.73
+Wikipedia,OFF,61.78,55.26,69.65
+FIFA World Cup,ON,78.30,72.68,72.58
+FIFA World Cup,OFF,64.58,63.96,74.17

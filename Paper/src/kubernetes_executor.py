@@ -1,10 +1,12 @@
 """Kubernetes execution backends: 2022 rolling updates and in-place resize."""
 from __future__ import annotations
 import copy, hashlib, threading, time
-from kubernetes import client, config
 
 
 def _load_config():
+    # Defer the Kubernetes client dependency until an executor is enabled so
+    # controller/model diagnostics also run on a plain dashboard workstation.
+    from kubernetes import client, config
     try:
         config.load_incluster_config()
     except config.ConfigException:
@@ -42,6 +44,7 @@ class InPlaceResizeExecutor:
     _CONTENT_TYPE = 'application/strategic-merge-patch+json'
 
     def __init__(self, namespace, deployment, container_name=None):
+        from kubernetes import client
         _load_config()
         self.namespace      = namespace
         self.deployment     = deployment
@@ -132,6 +135,7 @@ class RollingUpdateExecutor:
     """
 
     def __init__(self, namespace, deployment, timeout_seconds=180):
+        from kubernetes import client
         _load_config()
         self.namespace  = namespace
         self.timeout    = timeout_seconds

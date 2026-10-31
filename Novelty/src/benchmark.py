@@ -18,10 +18,14 @@ PERFORMANCE_MODELS = {
 }
 
 
-def benchmark_forecasters(train, test, epochs, batch_size, window_stride=1, models_dir=None, progress_every=5):
+def benchmark_forecasters(train, test, epochs, batch_size, window_stride=1, models_dir=None, progress_every=5, seed=42):
     rows = []
     history = list(train)
     for name, factory in FORECASTERS.items():
+        import random
+        random.seed(seed); np.random.seed(seed)
+        import torch
+        torch.manual_seed(seed)
         model = factory()
         fit_epochs = epochs
         
@@ -36,7 +40,7 @@ def benchmark_forecasters(train, test, epochs, batch_size, window_stride=1, mode
         
         if not loaded:
             print(f"Training {name} from scratch for {fit_epochs} epochs...", flush=True)
-            model.fit(train, epochs=fit_epochs, batch_size=batch_size, window_stride=window_stride, progress_every=progress_every, label=name)
+            model.fit(train, epochs=fit_epochs, batch_size=batch_size, window_stride=window_stride, progress_every=progress_every, label=name, seed=seed)
 
         actuals, preds = [], []
         running = list(history)

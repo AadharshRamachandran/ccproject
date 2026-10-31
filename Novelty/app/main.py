@@ -4,7 +4,10 @@ from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_
 import math, time
 app=FastAPI(title='CPU-bound house-price benchmark')
 requests=Counter('http_requests_total','Requests received',['method','route','status_code'])
-latency=Histogram('http_request_duration_seconds','Request duration',['method','route','status_code'])
+# Include the exact 350 ms SLO boundary so Prometheus can count compliant
+# requests directly with the le="0.35" bucket in live_dashboard.py.
+latency=Histogram('http_request_duration_seconds','Request duration',['method','route','status_code'],
+                  buckets=(.005,.01,.025,.05,.075,.1,.25,.35,.5,.75,1.0,2.5,5.0,7.5,10.0))
 @app.middleware('http')
 async def instrument(request:Request,call_next):
     started=time.perf_counter(); response=await call_next(request); labels=(request.method,request.url.path,str(response.status_code))

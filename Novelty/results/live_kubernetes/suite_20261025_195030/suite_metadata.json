@@ -1,0 +1,33 @@
+{
+  "suite_id": "suite_20261025_195030",
+  "measurement_type": "live_kubernetes_locust_prometheus",
+  "traces": [
+    "azurefunctions2019"
+  ],
+  "policies": [
+    "paper_hybrid",
+    "N1+N4",
+    "N2+N4",
+    "N3+N4",
+    "N1+N2+N4",
+    "N1+N3+N4",
+    "N2+N3+N4",
+    "N1+N2+N3+N4"
+  ],
+  "max_points": 5,
+  "tick_seconds": 60,
+  "segment_start": 4225,
+  "segment_train_points": 300,
+  "paper_worldcup_burst_intervals_1based": [
+    27,
+    54
+  ],
+  "paper_worldcup_first_interval": 1,
+  "max_qps": 20.0,
+  "max_users": 30,
+  "apply_changes": true,
+  "arms": 8,
+  "profile_seconds_per_arm": 300,
+  "expected_total_hours": 0.67,
+  "status": "completed"
+}

@@ -1,6 +1,9 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
-metadata: {name: house-price, namespace: hybrid-autoscaling}
+metadata:
+  name: house-price
+  namespace: hybrid-autoscaling
+  labels: {release: kube-prometheus-stack}
 spec:
   selector: {matchLabels: {app: house-price}}
   endpoints: [{port: http, path: /metrics, interval: 15s}]

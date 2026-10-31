@@ -2,6 +2,12 @@
 
 This document provides a comprehensive explanation of the four architectural novelties implemented in this project over the Vu, Tran, and Kim (2022) baseline, including their theoretical rationales, code structures, and empirical outcomes from the ablation study.
 
+## Corrected full-trace run (supersedes earlier results below)
+
+The full factorial run is `Novelty/results/factorial_full_trace_seed42/`: 125,310 WorldCup98 samples, chronological 80/20 development/held-out split, 25,062 held-out ticks, seed 42, 10 epochs, and the synthetic performance fixture. It contains Paper Hybrid, all four isolated novelties, and all 11 combinations. Paper Hybrid recorded 0.01596% SLO violations, 13.102% mean utilization, and 903.638 resource-cost units. The all-four arm recorded 0.00399% SLO violations, 13.113% utilization, and 902.328 cost units. Its paired 2,000-draw block-bootstrap SLO interval reaches zero, so the study does not establish a reliable SLO improvement. The emulator and resize accounting are synthetic; these are not measured cluster results. See the run report, summary, paired effects, and metadata in that folder for all configurations.
+
+N2 and N4 have lower SLO point estimates; N1 and N4 have lower cost point estimates. No novelty has paired 95% confidence intervals below zero on both outcomes. The synthetic capacity formula and closed response-time curve are not independently measured. N1/N4 cost changes are not proof of real performance; in-place resize is assigned zero overlap without modeling resize readiness or transient CPU mismatch. The collected performance file has only nine rows and is not suitable for calibration. Use the detailed report and paired block-bootstrap intervals in the results folder; do not cite earlier percentages in this document as current results.
+
 ---
 
 ## 1. Validation-Tuned Adaptive Burst Detection (`tuned_adaptive`)
@@ -11,13 +17,14 @@ The baseline paper utilizes an online Z-score detector (Algorithm 1) to identify
 
 ### Our Novelty Extension
 We implement a **validation-tuned, volatility-adaptive burst detector**:
-1. **Validation Optimization:** Before evaluation, the script reserves a validation slice of the training data. It runs a parameter search to find optimal values for `threshold`, `influence`, and `minimum_threshold` that minimize total resource cost subject to the paper's target SLO threshold (3.68%).
-2. **Volatility Adaptivity:** Instead of a static threshold, the detector computes a rolling coefficient of variation ($CV = \sigma / \mu$). When volatility is low, the threshold decreases to catch subtle spikes early. During high-volatility noise, the threshold increases to prevent false-alarm over-provisioning.
+1. **Residual Signal:** At each one-minute observation, the detector receives the signed one-step forecast residual (observed demand minus predicted demand). Positive errors indicate underprediction, the direction that can cause an SLO miss.
+2. **Validation Optimization:** Before evaluation, the script reserves a validation slice of the training data. It tunes detector parameters using a validation SLO target strictly below the Paper Hybrid validation rate and scores resource cost including rolling overlap.
+3. **Volatility Adaptivity:** The residual window's standard deviation is scaled by its mean absolute magnitude, which remains stable when signed residuals average near zero. Candidate thresholds and persistence gates are selected on validation only.
 
 * **Code Reference:** [`Novelty/src/burst.py`](file:///c:/Users/HP/OneDrive/Desktop/Project/Cloud%20computing%20project/Novelty/src/burst.py) (see `AdaptiveBurstDetector` and `tune_burst_parameters`)
 
 ### Ablation Findings
-On the FIFA World Cup trace, the tuned burst policy selected conservative parameters to prioritize SLO safety. This increased the resource cost (from **126.9** to **139.4**) without providing a proportional SLO improvement. This indicates that the paper's default parameters (5.0, 0.5) were already highly optimized for the World Cup trace's specific spike density.
+In the corrected full-trace run, N1 had 0.016% SLO violations (equal to Paper Hybrid) and cost 902.503 vs 903.638. The paired cost interval was [$-$1.639,$-$0.676] within this single synthetic run; it still does not establish overall dominance because SLO did not improve and the fixture is not measured cluster data.
 
 ---
 
@@ -28,19 +35,34 @@ The baseline paper uses a standard deterministic Bi-LSTM, which outputs a single
 
 ### Our Novelty Extension
 We replace the point forecaster with a **probabilistic Quantile Bi-LSTM**:
-1. **Quantile Forecasting:** The neural network is trained using Pinball Loss to output three quantiles: P10, P50 (median), and P90.
+1. **Residual Quantile Forecasting:** The network predicts P10/P50/P90 next-step residuals around the last observed value using Pinball Loss and a persistence skip connection.
 2. **Gated Uncertainty Scaling:** 
-   * **Normal state:** The scaler targets the P50 forecast using the standard DTR performance model.
-   * **Burst state:** The scaler dynamically switches to the P90 forecast. The workload prediction is boosted proportionally to the *prediction interval width* ($P90 - P10$), adjusting the CPU allocation depending on how uncertain the model is.
+   * **Normal state:** The scaler uses a validation-selected interpolation gain across the P10/P50/P90 interval. The corrected run selected -0.75 (toward P10); this setting reduced the SLO point estimate slightly but did not lower resource cost.
+   * **Burst state:** The scaler uses a width-aware high-CPU path, adjusting workload and CPU allocation according to the calibrated interval width.
 
 * **Code Reference:** [`Novelty/src/forecast.py`](file:///c:/Users/HP/OneDrive/Desktop/Project/Cloud%20computing%20project/Novelty/src/forecast.py) (see `QuantileBiLSTMForecaster`) and [`Novelty/src/scaler.py`](file:///c:/Users/HP/OneDrive/Desktop/Project/Cloud%20computing%20project/Novelty/src/scaler.py) (see `UncertaintyAwareProvisioner`)
 
 ### Ablation Findings
-This novelty was highly successful. By incorporating P90 safety buffers dynamically instead of using a rigid maximum-capacity fallback, SLO violations were cut from **1.597%** to **0.625%** (a **60% reduction in violations**), while keeping the resource cost practically identical (**124.7** vs. **126.9**).
+In the corrected run, validation selected safety gain **-0.75**. Held-out SLO violations were 0.008% vs 0.016% for Paper Hybrid, while cost was 903.641 vs 903.638. Quantile forecast MAE was 1.894 vs 2.419 for Bi-LSTM, and empirical P10--P90 coverage was 90.52%. It improved forecast error and the SLO point estimate, but not cost; paired intervals include zero.
 
 ---
 
-## 3. Pod In-Place Resource Resizing (`inplace`)
+## 3. Adaptive Monitoring Cadence (`adaptive`)
+
+### The Problem in the Paper
+The baseline paper uses a fixed monitoring interval of 60 seconds. Polling Prometheus every 60 seconds is wasteful during flat, stable traffic periods, but may be too slow to catch transient spikes during bursty periods.
+
+### Our Novelty Extension
+We implement a **workload-adaptive monitoring interval**:
+1. **Dynamic Scaling:** The interval scales between 15 seconds and a validation-selected maximum (120 seconds in the corrected run).
+2. **Volative and Width Gates:** The interval size is updated using both the rolling load coefficient of variation ($CV$) and the forecaster's predicted relative uncertainty interval width.
+
+* **Code Reference:** [`Novelty/src/monitoring.py`](file:///c:/Users/HP/OneDrive/Desktop/Project/Cloud%20computing%20project/Novelty/src/monitoring.py) (see `AdaptiveMonitoringInterval`)
+
+### Ablation Findings
+On the corrected holdout, monitor cycles fell from 25,062 to 24,106 and realized average interval was 62.4 seconds. Cost changed from 903.638 to 903.580, while SLO stayed at 0.016%. The paired cost interval includes zero. At 60-second trace resolution, shorter scheduled intervals cannot produce more frequent observations.
+
+## 4. Pod In-Place Resource Resizing (`inplace`)
 
 ### The Problem in the Paper
 In 2022, dynamically changing container CPU allocations (vertical scaling) required a rolling update. The Kubernetes API destroyed the old Pod and deployed a new one. This created a resource overlap period (Eq. 4 in the paper) where both pods ran concurrently, incurring high temporary cost overhead and potential replication latency.
@@ -48,28 +70,17 @@ In 2022, dynamically changing container CPU allocations (vertical scaling) requi
 ### Our Novelty Extension
 With the release of Kubernetes v1.35+, we implement an **In-Place Pod Resize** backend:
 1. **Symbolic Patching:** The vertical resize is done by issuing a `PATCH` request to the Pod's `spec.containers.resources` subresource.
-2. **Zero-Overlap Actuation:** Because the container is resized in-place without restart or destruction (`resizePolicy: NotRequired` for CPU), the old/new deployment overlap cost is mathematically **zero**.
+2. **In-Place API Path:** The executor requests a Pod resize through Kubernetes' resize subresource. The emulator currently charges no rolling overlap on this path; this is an accounting assumption, not proof of zero live resize latency or resource overlap.
 
 * **Code Reference:** [`Novelty/src/kubernetes_executor.py`](file:///c:/Users/HP/OneDrive/Desktop/Project/Cloud%20computing%20project/Novelty/src/kubernetes_executor.py) (see `InPlaceResizeExecutor`)
 
 ### Ablation Findings
-This is a strict Pareto improvement. Switching from `rolling` to `inplace` execution eliminated the rolling overlap cost completely (reducing it from **7.38** to **0.00**), while slightly improving the average SLO violation rate (from **1.597%** to **0.833%**) due to the faster actuation speed of API patches.
+In the corrected run, SLO violations were 0.012% vs 0.016% for Paper Hybrid. In-place cost was 903.063 vs 903.638 and modeled rolling overlap was zero. The paired cost interval was [$-$0.836,$-$0.328], while the SLO interval reached zero. This small cost difference is an accounting assumption: resize delay, readiness, and transient CPU mismatch are not represented. It is not evidence that live in-place resizing improves both SLO and cost.
 
 ---
 
-## 4. Adaptive Monitoring Cadence (`adaptive`)
+## Controlled run and interpretation
 
-### The Problem in the Paper
-The baseline paper uses a fixed monitoring interval of 60 seconds. Polling Prometheus every 60 seconds is wasteful during flat, stable traffic periods, but may be too slow to catch transient spikes during bursty periods.
-
-### Our Novelty Extension
-We implement a **workload-adaptive monitoring interval**:
-1. **Dynamic Scaling:** The interval scales between a minimum of 15 seconds (high volatility/bursts) and a maximum of 180 seconds (quiescent traffic).
-2. **Volative and Width Gates:** The interval size is updated using both the rolling load coefficient of variation ($CV$) and the forecaster's predicted relative uncertainty interval width.
-
-* **Code Reference:** [`Novelty/src/monitoring.py`](file:///c:/Users/HP/OneDrive/Desktop/Project/Cloud%20computing%20project/Novelty/src/monitoring.py) (see `AdaptiveMonitoringInterval`)
-
-### Ablation Findings
-Adaptive monitoring reduced the total number of controller execution cycles by **~40%** (from **1440** monitoring runs to **876** runs) with negligible impact on the SLO violation rate, proving that variable-cadence monitoring is an effective way to lower API and controller overhead.
+The earlier 1,440-tick results in saved reports were produced by a shorter trace window and are superseded by the corrected full-trace run above. Results across those different windows or training settings must not be combined. No current run supports the claim that all four standalone novelties beat Paper Hybrid on both SLO and cost.
 
 ---

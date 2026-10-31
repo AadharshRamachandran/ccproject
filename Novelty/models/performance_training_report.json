@@ -1,0 +1,105 @@
+{
+  "data_origin": "Measured Kubernetes house-price service with Locust and Prometheus. Historical calibration rows used HPA-selected replicas; the added 450m CPU calibration used two fixed replicas on an Azure development segment.",
+  "sources": [
+    "Novelty\\data\\collected\\performance_live_hpa.csv",
+    "Novelty\\data\\collected\\performance_live_hpa_extra.csv",
+    "Novelty\\data\\collected\\performance_live_hpa_more.csv",
+    "Novelty\\data\\collected\\performance_live_hpa_lowrate.csv",
+    "Novelty\\data\\collected\\performance_live_cost_450m.csv"
+  ],
+  "filter": {
+    "response_ms_at_or_below": "min(slo_ms, slo_max_ms)",
+    "slo_max_ms": 350,
+    "minimum_request_rate": 0.5,
+    "invalid_rows_removed": 3
+  },
+  "rows": 100,
+  "heldout_validation": {
+    "method": "80/20 GroupShuffleSplit by measurement run; explicitly identified calibration runs remain in one group, and legacy sources retain contiguous triplet grouping.",
+    "random_seed": 42,
+    "train_rows": 82,
+    "test_rows": 18,
+    "train_load_runs": 22,
+    "test_load_runs": 6,
+    "targets": {
+      "replicas": {
+        "mae": 0.16666666666666666,
+        "rmse": 0.408248290463863,
+        "r2": 0.0
+      },
+      "utilization": {
+        "mae": 0.2270826227317608,
+        "rmse": 0.30103286149332525,
+        "r2": 0.12555374485862658
+      }
+    }
+  },
+  "paper_model_comparison": {
+    "method": "random 80/20 holdout; MinMax scaling fitted on train split",
+    "seed": 42,
+    "train_rows": 80,
+    "test_rows": 20,
+    "models": {
+      "LR": {
+        "test_mse_normalized": 0.05007828834312135,
+        "test_mae_normalized": 0.1812227822869612,
+        "test_rows": 20
+      },
+      "RDF": {
+        "test_mse_normalized": 0.009255440295823196,
+        "test_mae_normalized": 0.043504656058109256,
+        "test_rows": 20
+      },
+      "SVR": {
+        "test_mse_normalized": 0.030159622019460982,
+        "test_mae_normalized": 0.12586705176182747,
+        "test_rows": 20
+      },
+      "MLP": {
+        "test_mse_normalized": 0.0507908028500966,
+        "test_mae_normalized": 0.18187126036538656,
+        "test_rows": 20
+      },
+      "DTR": {
+        "test_mse_normalized": 0.029531802678211545,
+        "test_mae_normalized": 0.059671430560888285,
+        "test_rows": 20
+      },
+      "XGB": {
+        "test_mse_normalized": 0.03541336357975659,
+        "test_mae_normalized": 0.062567814769818,
+        "test_rows": 20
+      }
+    },
+    "controller_model": "DTR"
+  },
+  "paper_selection_note": "The published method compares LR, RDF, SVR, XGB, MLP, and DTR after 80/20 normalized holdout evaluation. This implementation evaluates the available families on this project's measured table and fits DTR for every baseline/novelty arm, following the paper's reported choice.",
+  "coverage": {
+    "cpu_millicores": [
+      450,
+      600,
+      800,
+      950
+    ],
+    "replicas": [
+      1,
+      2
+    ],
+    "request_rate_min": 0.7778123472154318,
+    "request_rate_max": 21.97875461131606,
+    "distinct_request_rates": 80,
+    "p95_response_ms_min": 48.515625,
+    "p95_response_ms_max": 320.83336934236337,
+    "all_p95_within_slo": true
+  },
+  "artifacts": {
+    "training_data": "Novelty\\data\\collected\\performance_measured_inslo.csv",
+    "novelty_dtr": "Novelty\\models\\performance.joblib",
+    "paper_dtr": "Paper\\models\\performance.joblib"
+  },
+  "limitations": [
+    "This is measured calibration data from the local Minikube benchmark service, not production Kubernetes traces.",
+    "The offline trace ablation still estimates latency and SLO with its simulator; using this DTR does not make those simulated outcomes live measurements.",
+    "The benchmark has one application and a limited CPU/request-rate envelope; extrapolation outside the recorded range is unvalidated."
+  ]
+}

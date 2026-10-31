@@ -1,6 +1,8 @@
-# Predictive Hybrid Autoscaling — Paper Baseline
+# Predictive Hybrid Autoscaling — Paper-Method Baseline
 
-Reproducible implementation of the paper baseline: a Bi-LSTM workload forecast, fixed Z-score burst detection, a decision-tree performance model, and a rolling-update Kubernetes executor. The novelty extension is in [../Novelty](../Novelty/README.md).
+Implementation of the specified 2022 paper controller: a Bi-LSTM workload forecast, fixed moving-window burst detection, a normalized multi-output DTR, the hybrid provisioner, and rolling-update execution. The novelty extension imports these same baseline components from [../Novelty](../Novelty/README.md).
+
+See [IMPLEMENTATION_FIDELITY.md](IMPLEMENTATION_FIDELITY.md) for the paper-specified behavior and the original data/hyperparameter details that are not published with this project. Project results are not the paper's original measured results.
 
 ## Setup
 
@@ -13,16 +15,16 @@ pip install -r .\Paper\requirements.txt
 $env:PYTHONPATH = "$PWD;$PWD\Paper"
 ```
 
-Prepare data and create a development performance fixture:
+Prepare the workload trace and train with a collected performance table:
 
 ```powershell
 python .\Paper\scripts\prepare_worldcup98.py --input .\worldcup98-dataset\invocation_count.csv --out .\Paper\data\processed\worldcup98_minute.csv
 python .\Paper\scripts\generate_performance_data.py --out .\Paper\data\generated\performance.csv
-python .\Paper\scripts\train.py --workload .\Paper\data\processed\worldcup98_minute.csv --performance .\Paper\data\generated\performance.csv --models .\Paper\models
+python .\Paper\scripts\train.py --workload .\Paper\data\processed\worldcup98_minute.csv --performance .\Paper\data\collected\performance.csv --models .\Paper\models
 python -m unittest discover -s Paper\tests -v
 ```
 
-The generated performance data is for pipeline development only. Do not mix it with live measurements or use it for deployment conclusions.
+Use `data/generated/performance.csv` only for pipeline development. The training report records the 80/20 model comparison, selected controller DTR, settings, and reproduction limits. Use the measured Locust/Prometheus table for experiment results.
 
 ## Real Kubernetes, Locust, and Prometheus validation
 

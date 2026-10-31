@@ -1,0 +1,42 @@
+{
+  "trace": "worldcup98",
+  "workload_unit": "qps",
+  "workload_source": "Novelty\\data\\processed\\worldcup98_minute.csv",
+  "source_unit": "requests_per_minute",
+  "workload_split": {
+    "method": "custom_contiguous_segment",
+    "test_start_source_index": 123840,
+    "training_start_source_index": 123540,
+    "training_points": 300,
+    "test_points": 75,
+    "training_peak_qps_before_scale": 23.966666666666665,
+    "target_training_peak_qps": 20.0,
+    "scale_factor": 0.8344923504867873
+  },
+  "seed": 42,
+  "epochs": 80,
+  "lookback": 10,
+  "burst_parameters": {
+    "threshold": 0.25,
+    "influence": 0.25,
+    "volatility_adaptive": false,
+    "volatility_gain": 1.0,
+    "min_threshold": 0.25,
+    "consecutive_exceedances": 1,
+    "magnitude_floor": 0.0,
+    "forecast_error_margin": 0.0
+  },
+  "burst_validation_score": 25.0,
+  "burst_validation_risk_threshold_qps": 13.676634214186372,
+  "quantile_safety_gain": 0.5,
+  "quantile_max_relative_width": 0.44544035302926976,
+  "monitor_minimum_seconds": 15,
+  "monitor_maximum_seconds": 120,
+  "monitor_high_cv_percentile": 0.4,
+  "monitor_low_cv": 0.1019978542285641,
+  "monitor_high_cv": 0.13292244976112896,
+  "validation_points": 60,
+  "test_profile_qps_min": 5.090403337969402,
+  "test_profile_qps_max": 17.941585535465926,
+  "note": "Canonical Paper Bi-LSTM trained on a 300-point contiguous training subset followed by a 75-point held-out subset (80/20). Novelty tuning uses a validation tail inside the training subset. The paper original subset, exact scaling, calibration table, and trained weights are not available."
+}

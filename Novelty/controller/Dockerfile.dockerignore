@@ -1,0 +1,20 @@
+# Keep the root-context controller build small and deterministic.
+.git/
+**/.venv/
+**/venv/
+**/node_modules/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+worldcup98-dataset/
+*.pdf
+*.zip
+__pycache__/
+**/__pycache__/
+Paper/.venv/
+Paper/data/
+Paper/tests/
+Novelty/results/
+tmp/
+**/dist/
+**/build/

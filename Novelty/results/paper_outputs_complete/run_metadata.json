@@ -1,0 +1,30 @@
+{
+  "capacity_peak": 1800.0,
+  "window": 7200,
+  "epochs": 10,
+  "traces": {
+    "worldcup98_fifa": {
+      "source": "C:\\Users\\HP\\OneDrive\\Desktop\\Project\\Cloud computing project\\Novelty\\data\\processed\\worldcup98_minute.csv",
+      "window_points": 7200,
+      "train_points": 4608,
+      "test_points": 1440,
+      "headline": "Paper Hybrid SLO 0.069%, cost 161.071, util 60.67%. Standalone N4 in-place SLO 0.000%, cost 155.520, util 60.65%. All-four novelties SLO 0.347%, cost 135.846, util 69.39% (SLO not lower, cost better, util higher or equal)."
+    },
+    "azurefunctions2019_wikipedia_like": {
+      "source": "C:\\Users\\HP\\OneDrive\\Desktop\\Project\\Cloud computing project\\Novelty\\data\\processed\\azurefunctions2019_minute.csv",
+      "window_points": 7200,
+      "train_points": 4608,
+      "test_points": 1440,
+      "headline": "Paper Hybrid SLO 5.764%, cost 274.018, util 99.32%. Standalone N4 in-place SLO 4.931%, cost 267.432, util 99.40%. All-four novelties SLO 0.208%, cost 324.774, util 86.72% (SLO better, cost not lower, util lower)."
+    }
+  },
+  "paper_parameters": {
+    "interval_seconds": 60,
+    "lookback": 10,
+    "burst_threshold": 5,
+    "burst_influence": 0.5,
+    "slo_ms": 350,
+    "rmin": 600,
+    "rmax": 950
+  }
+}

@@ -1,0 +1,5 @@
+Trace,Burst zone,Reactive HPA SLO violation (%),Proactive HPA SLO violation (%),Paper proposal SLO violation (%)
+Wikipedia,ON,22.14,2.87,2.96
+Wikipedia,OFF,8.63,1.14,1.53
+FIFA World Cup,ON,20.54,4.10,3.89
+FIFA World Cup,OFF,5.47,1.57,1.86

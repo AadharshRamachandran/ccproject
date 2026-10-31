@@ -1,0 +1,13 @@
+{
+  "workload_unit": "qps",
+  "validation_points": 2400,
+  "workload_scale_factor": 0.0009533130807265516,
+  "training_peak_qps": 20.0,
+  "monitor_minimum_seconds": 15,
+  "monitor_maximum_seconds": 120,
+  "monitor_high_cv_percentile": 0.4,
+  "quantile_safety_gain": -0.75,
+  "quantile_max_relative_width": 0.08361598220584619,
+  "monitor_low_cv": 0.02474696422262515,
+  "monitor_high_cv": 0.030557325491253506
+}

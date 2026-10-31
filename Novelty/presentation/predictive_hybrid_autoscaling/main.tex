@@ -1,0 +1,223 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+
+\title[Forecasting, Provisioning, Execution \& Monitoring]{Predictive Hybrid Autoscaling: Forecasting,\\Provisioning, Execution, and Monitoring\\Extensions for Kubernetes}
+\subtitle{Combined Report (Objective 1 + Objective 2) --- Extending Vu, Tran, and Kim (2022)\\IT418 -- Cloud Computing Course Project}
+\author{Aadharsh Ramachandran (231IT001) \and Paluru Pavan Kumar (231IT046)}
+\institute[NITK]{National Institute of Technology Karnataka}
+\date{\today}
+
+\begin{document}
+
+% ---------------- Title ----------------
+\begin{frame}
+\titlepage
+\end{frame}
+
+% ---------------- Paper Context ----------------
+\begin{frame}{Paper Context}
+\textbf{Vu, Tran, Kim --- ``Predictive Hybrid Autoscaling for Containerized Applications,'' IEEE Access, 2022}
+
+\vspace{0.2cm}
+\begin{itemize}
+  \item Kubernetes HPA / VPA are reactive and single-dimension.
+  \item Paper proposes a predictive hybrid loop: Bi-LSTM forecaster + Z-score burst detector + DTR performance model $\varphi(\omega,r,\tau_{\text{slo}})\to(n,u)$.
+  \item Execution: rolling-update deployment swap on a fixed 60\,s poll.
+  \item Cost equations explicitly charge temporary dual-deployment overlap on every CPU-per-pod change.
+\end{itemize}
+
+\vspace{0.15cm}
+This work reproduces the full loop and extends every stage: what is predicted, how conservatively it is provisioned, how a decision is executed, and how often the system checks.
+\end{frame}
+
+% ---------------- Problem ----------------
+\begin{frame}{Problem}
+\begin{itemize}
+  \item Decision layer: burst constants hardcoded; forecaster emits only a point estimate.
+  \item Execution layer: rolling updates incur temporary overlap cost when old and new pods coexist (paper Equations 2--4).
+  \item Monitoring layer: fixed 60\,s poll is pure overhead on calm stretches and may be too coarse on volatile ones.
+\end{itemize}
+
+\vspace{0.25cm}
+Four components of the control loop are extended, grouped into two objectives.
+\end{frame}
+
+% ---------------- Objectives ----------------
+\begin{frame}{Four Extensions, Two Objectives}
+\begin{columns}[t]
+\column{0.5\textwidth}
+\textbf{Objective 1 --- Decisions}
+\begin{itemize}
+  \small
+  \item[N1] Validation-tuned adaptive burst detection
+  \item[N2] Uncertainty-aware quantile provisioning
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{Objective 2 --- Execution}
+\begin{itemize}
+  \small
+  \item[N3] Adaptive monitoring cadence
+  \item[N4] In-place Pod CPU resize (cluster support required)
+\end{itemize}
+\end{columns}
+\vspace{0.4cm}
+\centering
+\small Each novelty is evaluated independently against Paper Hybrid on the WorldCup98 trace with a 350\,ms SLO.
+\end{frame}
+
+% ---------------- Architecture ----------------
+\begin{frame}{System Architecture}
+\centering
+\IfFileExists{arch_objective1and2.png}{%
+  \includegraphics[width=0.82\textwidth]{arch_objective1and2.png}%
+}{%
+  \small Bi-LSTM forecast $\rightarrow$ N1 adaptive burst detection / N2 quantile provisioning $\rightarrow$ N3 adaptive monitoring / N4 in-place resize $\rightarrow$ Kubernetes workload
+}
+\vspace{0.1cm}
+\small Orange = Objective 1 (N1, N2). Green = Objective 2 (N3, N4). Blue = reproduced from the paper.
+\end{frame}
+
+% ---------------- Baseline ----------------
+\begin{frame}{Baseline Reproduction}
+\begin{itemize}
+  \item \textbf{WorkloadForecaster:} 2-layer Bi-LSTM, lookback\,=\,10, single point output.
+  \item \textbf{PerformanceModel:} DecisionTreeRegressor trained on synthetic HPA ramp data; rows that already violate 350\,ms discarded.
+  \item \textbf{OnlineBurstDetector:} Algorithm 1 exactly (threshold\,=\,5, influence\,=\,0.5).
+  \item \textbf{HybridProvisioner:} Algorithm 2 --- burst $\to$ $r_{\max}$; otherwise search 600--950\,mCPU for best util under SLO.
+  \item \textbf{RollingUpdateExecutor:} dual-deployment swap; overlap window charged by paper cost equations.
+\end{itemize}
+\end{frame}
+
+% ---------------- Methodology Obj1 ----------------
+\begin{frame}{Methodology --- Objective 1 (Decisions)}
+\begin{columns}[t]
+\column{0.5\textwidth}
+\textbf{N1 --- AdaptiveBurstDetector}
+\begin{itemize}
+  \small
+  \item Volatility-adaptive threshold:\\
+  $\max(\text{min\_t},\,t\times(1+g\times\text{cv}))$
+  \item Hysteresis (consecutive exceedances)
+  \item Optional absolute magnitude floor
+  \item Tuned by 3-fold rolling CV, \textbf{worst-fold} scoring + soft SLO penalty
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{N2 --- UncertaintyAwareProvisioner}
+\begin{itemize}
+  \small
+  \item Quantile Bi-LSTM (P10/P50/P90) via pinball loss
+  \item Baseline decision identical to paper DTR policy
+  \item Uses quantile intervals in provisioning, with a validation-selected safety gain
+  \item Burst response uses relative interval width; saturation is calibrated at the 99th percentile
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% ---------------- Methodology Obj2 ----------------
+\begin{frame}{Methodology --- Objective 2 (Execution \& Monitoring)}
+\begin{columns}[t]
+\column{0.5\textwidth}
+\textbf{N3 --- AdaptiveMonitoringInterval}
+\begin{itemize}
+  \small
+  \item Adjusts polling cadence using validation-calibrated load volatility
+  \item Tested maximum intervals: 75--120\,s; evaluation operates on 60\,s trace ticks
+  \item Cuts monitoring cycles during calm periods while retaining frequent checks as urgency rises
+\end{itemize}
+\column{0.5\textwidth}
+\textbf{N4 --- InPlaceResizeExecutor}
+\begin{itemize}
+  \small
+  \item Changes pod CPU through the Kubernetes Pod \texttt{/resize} subresource when supported
+  \item Avoids modeled rolling overlap for CPU-only resize decisions
+  \item Replica-count changes still require normal rollout behavior
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% ---------------- Evaluation ----------------
+\begin{frame}{Evaluation Harness}
+\begin{itemize}
+  \item Trace-driven emulator (\texttt{ablation.py}) replays the held-out WorldCup98 test slice tick by tick.
+  \item ExperimentConfig freezes forecaster, burst detector, provisioner, executor, monitoring policy.
+  \item Forecast cache trains each distinct model once; all sharing configs reuse predictions.
+  \item Cost: steady-state (Eq.\ 2) + overlap (Eqs.\ 3--4) only for rolling-update path.
+  \item In-place path skips Eqs.\ 3--4 entirely; this is a simplifying simulator assumption.
+  \item Synthetic development performance fixture; collected cluster data is currently too small for model fitting.
+  \item Full 125,310-point trace, chronological 80/20 split, 10 forecast epochs, seed 42; 25,062 held-out intervals.
+\end{itemize}
+\end{frame}
+
+% ---------------- Results ----------------
+\begin{frame}{Results (FIFA World Cup 1998, emulator)}
+\centering
+\tiny
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Config} & \textbf{SLO\%} & \textbf{Util.\%} & \textbf{Cost} & \textbf{Cycles} & $\Delta$\textbf{Cost} \\
+\midrule
+Paper Hybrid (ref.) & 0.016 & 13.102 & 903.638 & 25062 & --- \\
+N1 --- adaptive burst & 0.016 & 13.110 & 902.503 & 25062 & $-$1.135 \\
+N2 --- quantile provisioning & 0.008 & 13.105 & 903.641 & 25062 & $+$0.004 \\
+N3 --- adaptive monitoring & 0.016 & 13.104 & 903.580 & 24106 & $-$0.058 \\
+N4 --- in-place resize & 0.012 & 13.103 & 903.063 & 25062 & $-$0.575 \\
+\bottomrule
+\end{tabular}
+\vspace{0.3cm}
+
+\normalsize
+\begin{itemize}
+  \small
+  \item SLO point estimates range from 0.008\% to 0.016\%; Paper Hybrid is 0.016\%.
+  \item Paired SLO CI (pp): N1 [0,0], N2 [$-$0.032,0], N3 [0,0], N4 [$-$0.018,0].
+  \item Paired cost CI: N1 [$-$1.639,$-$0.676], N2 [$-$0.439,+0.489], N3 [$-$0.218,+0.104], N4 [$-$0.836,$-$0.328].
+  \item N2 scaled-demand forecast MAE is 1.894 vs 2.419 for Bi-LSTM; empirical P10--P90 coverage is 90.52\%.
+  \item N3 used 956 fewer monitor cycles (62.4 s mean realized interval).
+\end{itemize}
+\end{frame}
+
+% ---------------- Ranking ----------------
+\begin{frame}{Novelty Sequence \& Interpretation}
+\begin{enumerate}
+  \item \textbf{N1 --- Adaptive burst detection}: same SLO point estimate; simulated cost is 1.135 lower.
+  \item \textbf{N2 --- Quantile provisioning}: lowest SLO point estimate and better forecast MAE, but cost is 0.004 higher.
+  \item \textbf{N3 --- Adaptive monitoring}: fewer monitor cycles; paired SLO and cost intervals include zero.
+  \item \textbf{N4 --- In-place resize}: SLO is 0.004 pp lower and modeled cost 0.575 lower; SLO CI reaches zero.
+\end{enumerate}
+\end{frame}
+
+% ---------------- Limitations ----------------
+\begin{frame}{Limitations \& Threats to Validity}
+\begin{itemize}
+  \item All numbers are offline emulator estimates using a synthetic performance fixture and closed-form response-time model, not measured cluster latency.
+  \item Single trace (FIFA World Cup 1998). Wikipedia burst density differs; relative ranking could change.
+  \item DTR surface, CPU tier list (600--950\,mCPU), and capacity peak (1800 req/interval) are specific to the house-price benchmark application.
+  \item One seed and one test window; paired block bootstrap does not account for model-seed or synthetic-fixture uncertainty.
+  \item In-place resize is assigned zero rolling overlap by construction; defer/resize latency and readiness are not simulated.
+  \item Live Kubernetes / Locust validation is still required, including verification of Pod resize support on the target cluster.
+\end{itemize}
+\end{frame}
+
+% ---------------- Conclusion ----------------
+\begin{frame}{Conclusion}
+\begin{itemize}
+  \item No novelty has paired 95\% intervals below zero for both SLO and cost.
+  \item N1 and N4 show lower simulated cost; in-place resizing still omits resize latency and transient capacity mismatch.
+  \item N2 improved scaled forecast MAE and its SLO point estimate, but cost did not decrease.
+\end{itemize}
+
+\vspace{0.25cm}
+\begin{alertblock}{Evaluation status}
+This run does not establish that any novelty beats Paper Hybrid on both SLO and cost with statistical confidence. The current measured performance dataset has only nine rows and cannot support calibration; collect a multi-load, multi-CPU Kubernetes/Locust dataset before making a performance claim.
+\end{alertblock}
+\end{frame}
+
+\end{document}

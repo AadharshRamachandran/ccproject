@@ -14,10 +14,9 @@ class Model:
 
 
 class NoveltyCoreTests(unittest.TestCase):
-    def test_adaptive_burst_requires_two_exceedances(self):
-        detector = AdaptiveBurstDetector(parameters=BurstParameters(threshold=2))
+    def test_adaptive_burst_fires_on_first_exceedance(self):
+        detector = AdaptiveBurstDetector(parameters=BurstParameters(threshold=2, consecutive_exceedances=1))
         detector.warm([10] * 10)
-        self.assertFalse(detector.update(100))
         self.assertTrue(detector.update(100))
 
     def test_hybrid_algorithm_is_shared_with_paper(self):
@@ -33,6 +32,23 @@ class NoveltyCoreTests(unittest.TestCase):
         provisioner = UncertaintyAwareProvisioner(Model(), max_relative_width=1.0)
         decision = provisioner.decide(1000, burst=False, interval=(990, 1000, 1010))
         self.assertEqual(decision.cpu_millicores, 950)
+
+    def test_nonburst_quantile_interval_adds_calibrated_upper_safety_margin(self):
+        provisioner = UncertaintyAwareProvisioner(Model(), interval_safety_gain=0.5)
+        point = provisioner.decide(1000, burst=False)
+        interval = provisioner.decide(1000, burst=False, interval=(900, 1000, 3000))
+        self.assertGreater(interval.replicas, point.replicas)
+
+    def test_negative_quantile_gain_uses_lower_quantile_for_cost_search(self):
+        class CapturingModel:
+            def __init__(self): self.workloads=[]
+            def predict(self, workload, cpu, slo):
+                self.workloads.append(workload)
+                return 1, 0.5
+        model=CapturingModel()
+        provisioner=UncertaintyAwareProvisioner(model, interval_safety_gain=-1.0)
+        provisioner.decide(200, burst=False, interval=(100, 200, 300))
+        self.assertEqual(model.workloads, [100.0] * len(provisioner.resources))
 
     def test_reactive_hpa_scale_down_cooldown(self):
         hpa = ReactiveHPA(scale_down_cooldown=3, stabilization_window=1)

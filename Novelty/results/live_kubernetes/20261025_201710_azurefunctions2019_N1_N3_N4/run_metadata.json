@@ -1,0 +1,100 @@
+{
+  "run_id": "20261025_201710_azurefunctions2019_N1_N3_N4",
+  "started_at": "2026-10-25T14:47:12.367410+00:00",
+  "measurement_type": "live_kubernetes_locust_prometheus",
+  "trace": "azurefunctions2019",
+  "policy": {
+    "name": "N1+N3+N4",
+    "n1_burst": true,
+    "n2_quantile": false,
+    "n3_adaptive_monitoring": true,
+    "n4_inplace_resize": true,
+    "apply_changes": true,
+    "trace": "azurefunctions2019",
+    "initial_history": [
+      14.810235009635067,
+      15.091965949684923,
+      15.10735489973986,
+      13.93731944857771,
+      14.492407929382825,
+      15.675682403754,
+      14.776877197310103,
+      14.406569271208745,
+      14.405211422674487,
+      13.790671806877729
+    ]
+  },
+  "profile": {
+    "path": "C:\\Users\\HP\\OneDrive\\Desktop\\Project\\Cloud computing project\\Novelty\\results\\live_kubernetes\\20261025_201710_azurefunctions2019_N1_N3_N4\\azurefunctions2019_test_profile.csv",
+    "trace": "azurefunctions2019",
+    "trace_name": "Azure Functions 2019",
+    "source_rows": 20160,
+    "test_rows": 5,
+    "profile_points": 5,
+    "profile_mode": "contiguous_trace_segment",
+    "segment_start_source_index": 4225,
+    "segment_training_start_source_index": 3925,
+    "segment_training_points": 300,
+    "max_qps_training_scale": 20.0,
+    "scale_factor": 0.0013578485342590843,
+    "dtr_qps_range": [
+      0.7778123472154318,
+      21.97875461131606
+    ],
+    "zero_demand_intervals_kept_zero": true,
+    "below_dtr_minimum_points": 0,
+    "above_dtr_maximum_points": 0,
+    "qps_min": 13.683628080760304,
+    "qps_max": 14.008832804715354,
+    "fraction_inside_dtr_qps_range": 1.0
+  },
+  "tick_seconds": 60,
+  "max_users": 30,
+  "app_url": "http://127.0.0.1:51138/api/v1/namespaces/hybrid-autoscaling/services/http:house-price:80/proxy",
+  "prometheus_url": "http://127.0.0.1:9090",
+  "controller_url": "http://127.0.0.1:8080",
+  "controller_configuration": {
+    "status": "configured",
+    "policy": {
+      "name": "N1+N3+N4",
+      "n1_burst": true,
+      "n2_quantile": false,
+      "n3_adaptive_monitoring": true,
+      "n4_inplace_resize": true,
+      "trace": "azurefunctions2019"
+    },
+    "actuation_enabled": true
+  },
+  "preflight": {
+    "app": {
+      "status": "will_check_after_deployment_reset"
+    },
+    "controller": {
+      "status": "ok",
+      "performance_model": "measured_dtr"
+    },
+    "prometheus": "ready",
+    "deployment": "house-price",
+    "kubernetes_available_replicas": 2
+  },
+  "benchmark_reset_actions": [
+    "kubectl -n hybrid-autoscaling set resources deployment/house-price -c app --requests=cpu=950m,memory=128Mi --limits=cpu=950m,memory=256Mi",
+    "restored baseline pod resources and one ready replica"
+  ],
+  "benchmark_app_port_forward": {
+    "status": "ready",
+    "app_url": "http://127.0.0.1:51138/api/v1/namespaces/hybrid-autoscaling/services/http:house-price:80/proxy",
+    "local_port": 51138,
+    "log": "C:\\Users\\HP\\OneDrive\\Desktop\\Project\\Cloud computing project\\Novelty\\results\\live_kubernetes\\20261025_201710_azurefunctions2019_N1_N3_N4\\app_service_proxy.log"
+  },
+  "measured_dtr_training": {
+    "report_path": "Novelty\\models\\performance_training_report.json",
+    "training_rows": 81,
+    "qps_range": [
+      0.7778123472154318,
+      21.97875461131606
+    ],
+    "data_origin": "measured Kubernetes house-price service under Locust with Kubernetes HPA-selected replicas; Prometheus request rate, p95 latency, and container CPU utilization"
+  },
+  "result_caveat": "Requests, latency, CPU, and ready replicas are measured. Segment mode replays contiguous trace points scaled using only the preceding development segment. No points are clipped to the DTR envelope; out-of-range points are reported."
+}
